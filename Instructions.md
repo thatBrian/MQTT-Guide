@@ -169,13 +169,11 @@ allow_anonymous false
 Then add the following lines:
 
 ```
-listener 1883 127.0.0.1
+listener 8883 127.0.0.1
 certfile /etc/mosquitto/certs/server.crt
 keyfile /etc/mosquitto/certs/server.key
 cafile /etc/mosquitto/ca_certificates/ca.crt
-allow_anonymous false
-require_certificate true
-use_identity_as_username true
+allow_anonymous true
 ```
 
 In the above lines we've removed the requirment for passwords and allowed anonymous connections. We've also made certificates required. This option `use_identity_as_username` causes the Common Name (CN) form the client certificate to be used instead of the MQTT username.
@@ -192,73 +190,64 @@ sudo systemctl restart mosquitto.service
 
 #### Certificate Authority
 
--   We'll first generate a certificate authority certificate and key
+-   We'll first generate a fake certificate authority's signing key
 
 ```
-openssl req -new -x509 -days <duration> -extensions v3_ca -keyout ca.key -out ca.crt
+openssl genrsa -des3 -out ca.key 2048
+```
+
+-   Next we'll generate a certificate signing request for the fake CA
+
+```
+openssl req -new -key ca.key -out ca-cert-request.csr -sha256
+```
+
+When generating the signing request, make sure to set the organization name and do not enter a commone name.
+
+-   Lastly, we'll create the fake CA's root certificate
+
+```
+openssl x509 -req -in ca-cert-request.csr -signkey ca.key -out ca-root-cert.crt -days 365 -sha256
 ```
 
 #### Server keys
 
--   Next we'll generate the server key. NOTE: Do not add a pass phrase as this would cause issues when starting Mosquitto.
+-   Next we'll generate the server key.
 
 ```
-openssl genrsa -aes256 -out server.key 2048
+openssl genrsa -out server.key 2048
 ```
 
--   We'll also generate a certificate signing request to send to the CA.
-    NOTE: When prompted for the CN (Common Name), please enter either your server (or broker) hostname or domain name.
+-   We'll also generate a certificate signing request to send to the CA. Please set a organization name and the common name. NOTE: When prompted for the CN (Common Name), please enter either your server (or broker) hostname or domain name. (localhost/127.0.0.1)
 
 ```
-openssl req -out server.csr -key server.key -new
+openssl req -new -key server.key -out server-cert-request.csr -sha256
 ```
 
 -   We'll sign the CSR with our CA key ("send to the CA")
 
 ```
-openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days <duration>
-```
-
-#### Client keys
-
--   Generate the client key
-
-```
-openssl genrsa -aes256 -out client.key 2048
-```
-
--   Generate a certificate signing request to send to the CA similar to previously
-
-```
-openssl req -out client.csr -key client.key -new
-```
-
--   Lastly sign the CSR with the CA key like previously as well
-
-```
-openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days <duration>
+openssl x509 -req -in server-cert-request.csr -CA ca-root-cert.crt -CAkey ca.key -CAcreateserial -out server.crt -days 360
 ```
 
 #### Verify and move files
 
 After completing all the above steps, you should be left with the following files
 
-1. ca.crt
-2. ca.key
-3. ca.srl
-4. client.crt
-5. client.csr
-6. client.key
-7. server.crt
-8. server.csr
-9. server.key
+1. ca-cert-request.csr
+2. ca-root-cert.crt
+3. ca-root-cert.srl
+4. ca.key
+5. server-cert-request.csr
+6. server.crt
+7. server.key
 
 Now that you've confirmed all the files exist we'll move the following files to the following directories:
 
 ```
 /etc/mosquitto/certs/server.crt
-/etc/mosquitto/certs/newServer.key
-/etc/mosquitto/ca_certificates/ca.crt
+/etc/mosquitto/certs/server.key
+/etc/mosquitto/ca_certificates/ca-root-cert.crt
 ```
 
 This was referenced in out Mosquitto config file. You may place them in and directory as long as you update the config file accordingly. Also please make sure the files have the correct permission. They should be readable by Mosquitto. (e.g. chmod 755 file.key)
@@ -280,6 +269,28 @@ systemctl status mosquitto.service
 ```
 
 You should see the `active (runnning)` status similarly to when we first setup the server. If you encounter an issue, make sure your config file is updated correctly and in the correct order. Also confirm that the keys and certificates were placed in the correct directory and have the correct permission.
+
+#### Update the connection script
+
+Now that we have the server running and the certificates setup we can attempt to connect to the server now.
+
+Head over to this file `client_with_TLS.py` and update following line with the location of your certificates and keys.
+
+```
+  client.tls_set(
+        './sampleCerts/ca-root-cert.crt',
+        './sampleCerts/server.crt',
+        './sampleCerts/server.key'
+    )
+```
+
+After this you can run the script `python3 client_with_TLS.py`
+
+You should now see the subscription outputs like before.
+
+Pull up Wireshark and review the content.
+
+For convenience we've included sample certificates and keys as well as a sample Wireshark capture.
 
 #### Conclusion
 

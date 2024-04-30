@@ -3,7 +3,7 @@ import time
 import os
 
 HOST = "127.0.0.1"
-PORT = 1883
+PORT = 8883
 
 def on_connect(client, userdata, flags, rc, properties):
     client.subscribe('#', qos=1)
