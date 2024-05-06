@@ -6,8 +6,10 @@ HOST = "127.0.0.1"
 PORT = 8883
 
 def on_connect(client, userdata, flags, rc, properties):
-    client.subscribe('#', qos=1)
-    client.subscribe('$SYS/#')
+    # client.subscribe('#', qos=1)
+    # client.subscribe('$SYS/#')
+    client.subscribe('test/#')
+    client.publish("test", "Secret message, you're not suppose to see this!")
     print("Connected")
 
 def on_message(client, userdata, message):
