@@ -296,4 +296,4 @@ For convenience we've included sample certificates and keys as well as a sample 
 
 This concludes on demonstation. Feel free to reach out if you have any questions or notice any ares that need to be fixed or improved.
 
-If you'd like to learn more about this Authentication, Mosquitto actually provides a pretty nice introduction in the documentation here: https://mosquitto.org/man/mosquitto-conf-5.html
+If you'd like to learn more about this Authentication, Mosquitto
